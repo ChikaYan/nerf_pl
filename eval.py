@@ -29,7 +29,7 @@ def get_opts():
     parser.add_argument('--scene_name', type=str, default='test',
                         help='scene name, used as output folder name')
     parser.add_argument('--split', type=str, default='val',
-                        choices=['val', 'test', 'test_train', 'all_val'])
+                        choices=['val', 'test', 'test_train', 'all_val', 'train_eval'])
     parser.add_argument('--img_wh', nargs="+", type=int, default=[800, 800],
                         help='resolution (img_w, img_h) of the image')
 
