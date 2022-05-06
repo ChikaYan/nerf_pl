@@ -1,0 +1,80 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Python: Current File",
+            "type": "python",
+            "request": "launch",
+            "program": "${file}",
+            "console": "integratedTerminal",
+            "justMyCode": true
+        },
+        {
+            "name": "train_llff",
+            "type": "python",
+            "request": "launch",
+            "program": "train.py",
+            "console": "integratedTerminal",
+            "justMyCode": true,
+            "args": [
+                "--dataset_name", "llff", "--root_dir", "data/hypernerf/kubric_single_car_rand_v2", "--img_wh", "256", "256", 
+                "--exp_name", "debug", "--encode_t", "--num_gpus", "0", "--N_vocab", "300"
+            ]
+        },
+        {
+            "name": "train_kubric",
+            "type": "python",
+            "request": "launch",
+            "program": "train.py",
+            "console": "integratedTerminal",
+            "justMyCode": true,
+            "args": [
+                "--dataset_name", "kubric", "--root_dir", "data/hypernerf/kubric_single_car_rand_v2_gt", "--img_wh", "256", "256", 
+                "--exp_name", "debug", "--encode_t", "--num_gpus", "0", "--N_vocab", "300"
+            ]
+        },
+        {
+            "name": "train_hypernerf",
+            "type": "python",
+            "request": "launch",
+            "program": "train.py",
+            "console": "integratedTerminal",
+            "justMyCode": true,
+            "args": [
+                "--dataset_name", "hypernerf", "--root_dir", "data/hypernerf/pick_drop", "--img_wh", "-1", "-1", 
+                "--exp_name", "debug", "--encode_a", "--encode_t", "--num_gpus", "0", "--N_vocab", "1200"
+            ]
+        },
+        {
+            "name": "eval_llff",
+            "type": "python",
+            "request": "launch",
+            "program": "eval.py",
+            "console": "integratedTerminal",
+            "justMyCode": true,
+            "args": [
+                "--dataset_name", "llff", "--root_dir", "data/hypernerf/kubric_single_car_rand_v2", "--img_wh", "256", "256", 
+                "--split", "all_val", "--N_importance", "64", "--encode_t", "--N_vocab", "300",
+                "--ckpt_path", "ckpts/kubric_single_car_rand_v2/t/last.ckpt", 
+                "--scene_name", "kubric_single_car_rand_v2/t"
+            ]
+        },
+        {
+            "name": "eval_kubric",
+            "type": "python",
+            "request": "launch",
+            "program": "eval.py",
+            "console": "integratedTerminal",
+            "justMyCode": true,
+            "args": [
+                "--dataset_name", "kubric", "--root_dir", "data/hypernerf/kubric_single_car_rand_v2_gt", "--img_wh", "256", "256", 
+                "--split", "all_val", "--N_importance", "64", "--encode_t", "--N_vocab", "300",
+                "--ckpt_path", "ckpts/kubric_single_car_rand_v2_gt/t/last.ckpt", 
+                "--scene_name", "kubric_single_car_rand_v2_gt/debug"
+            ]
+        }
+    ]
+}
