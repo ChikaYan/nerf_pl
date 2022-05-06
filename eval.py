@@ -167,9 +167,13 @@ if __name__ == "__main__":
     regular_dir = Path(dir_name) / 'regular'
     static_dir = Path(dir_name) / 'static'
     mask_dir = Path(dir_name) / 'mask'
+    transient_dir = Path(dir_name) / 'transient'
+
     regular_dir.mkdir(exist_ok=True, parents=True)
     static_dir.mkdir(exist_ok=True, parents=True)
     mask_dir.mkdir(exist_ok=True, parents=True)
+    transient_dir.mkdir(exist_ok=True, parents=True)
+
     # import pdb; pdb.set_trace()
     # os.makedirs(dir_name, exist_ok=True)
 
@@ -221,16 +225,21 @@ if __name__ == "__main__":
         img_pred = np.clip(results['rgb_fine'].view(h, w, 3).cpu().numpy(), 0, 1)
         img_pred_static = np.clip(results['rgb_fine_static'].view(h, w, 3).cpu().numpy(), 0, 1)
         img_pred_mask = np.clip(results['transient_mask'].view(h, w, 3).cpu().numpy(), 0, 1)
+        transient_rgb_map_white = np.clip(results['transient_rgb_map_white'].view(h, w, 3).cpu().numpy(), 0, 1)
         
         img_pred_ = (img_pred*255).astype(np.uint8)
         img_pred_static_ = (img_pred_static*255).astype(np.uint8)
         img_pred_mask_ = (img_pred_mask*255).astype(np.uint8)
+        transient_rgb_map_white_ = (transient_rgb_map_white*255).astype(np.uint8)
+
         imgs += [img_pred_]
         imgs_static += [img_pred_static_]
         imgs_mask += [img_pred_mask_]
+
         imageio.imwrite(os.path.join(str(regular_dir), f'{i:03d}.png'), img_pred_)
         imageio.imwrite(os.path.join(str(static_dir), f'{i:03d}.png'), img_pred_static_)
         imageio.imwrite(os.path.join(str(mask_dir), f'{i:03d}.png'), img_pred_mask_)
+        imageio.imwrite(os.path.join(str(transient_dir), f'{i:03d}.png'), transient_rgb_map_white_)
 
         if 'rgbs' in sample:
             rgbs = sample['rgbs']
