@@ -534,6 +534,11 @@ class KubricDataset(Dataset):
         else:
             if self.split == 'val':
                 idx = self.val_ids[idx]
+            elif self.split == 'train_val':
+                # render only training views
+                all_ids = list(range(len(self.image_paths)))
+                train_ids = list(set(all_ids) - set(self.val_ids))
+                idx = train_ids[idx]
             c2w = torch.FloatTensor(self.poses[idx])
             # if self.split == 'val':
             # else:
