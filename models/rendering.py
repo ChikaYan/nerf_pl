@@ -187,6 +187,13 @@ def render_rays(models,
                 # Compute also static and transient rgbs when only one field exists.
                 # The result is different from when both fields exist, since the transimttance
                 # will change.
+
+                # render transient mask
+                trasient_mask = (transient_weights / torch.clip(transient_weights + static_weights, 1e-10))
+                trasient_mask = reduce(trasient_mask, 'pixel ray_sample -> pixel 1', 'sum')
+                results['transient_mask'] = trasient_mask * torch.ones([1,3]).to(trasient_mask.device)
+
+
                 static_alphas_shifted = \
                     torch.cat([torch.ones_like(static_alphas[:, :1]), 1-static_alphas], -1)
                 static_transmittance = torch.cumprod(static_alphas_shifted[:, :-1], -1)

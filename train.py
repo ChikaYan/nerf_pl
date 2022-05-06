@@ -28,7 +28,7 @@ from pytorch_lightning.loggers import TestTubeLogger
 class NeRFSystem(LightningModule):
     def __init__(self, hparams):
         super().__init__()
-        self.hparams = hparams
+        self.save_hyperparameters(hparams)
 
         self.loss = loss_dict['nerfw'](coef=1)
 
@@ -103,6 +103,13 @@ class NeRFSystem(LightningModule):
         elif self.hparams.dataset_name == 'blender':
             kwargs['img_wh'] = tuple(self.hparams.img_wh)
             kwargs['perturbation'] = self.hparams.data_perturb
+        elif self.hparams.dataset_name == 'llff':
+            kwargs['img_wh'] = tuple(self.hparams.img_wh)
+            kwargs['val_num'] = self.hparams.num_gpus
+        elif self.hparams.dataset_name == 'kubric':
+            kwargs['image_scale'] = 2.
+        elif self.hparams.dataset_name == 'hypernerf':
+            kwargs['image_scale'] = 4.
         self.train_dataset = dataset(split='train', **kwargs)
         self.val_dataset = dataset(split='val', **kwargs)
 
@@ -158,6 +165,11 @@ class NeRFSystem(LightningModule):
             if self.hparams.dataset_name == 'phototourism':
                 WH = batch['img_wh']
                 W, H = WH[0, 0].item(), WH[0, 1].item()
+            elif self.hparams.dataset_name == 'kubric':
+                W, H = 256, 256
+            elif self.hparams.dataset_name == 'hypernerf': # TODO fix
+                WH = batch['img_wh']
+                W, H = WH[0, 0].item(), WH[0, 1].item()
             else:
                 W, H = self.hparams.img_wh
             img = results[f'rgb_{typ}'].view(H, W, 3).permute(2, 0, 1).cpu() # (3, H, W)
@@ -182,12 +194,19 @@ class NeRFSystem(LightningModule):
 
 def main(hparams):
     system = NeRFSystem(hparams)
-    checkpoint_callback = \
-        ModelCheckpoint(filepath=os.path.join(f'ckpts/{hparams.exp_name}',
-                                               '{epoch:d}'),
-                        monitor='val/psnr',
-                        mode='max',
-                        save_top_k=-1)
+    # checkpoint_callback = \
+    #     ModelCheckpoint(os.path.join(f'ckpts/{hparams.exp_name}',
+    #                                            '{epoch:d}'),
+    #                     monitor='val/psnr',
+    #                     mode='max',
+    #                     save_top_k=-1)
+    checkpoint_callback = ModelCheckpoint(
+        dirpath=f"ckpts/{hparams.exp_name}",
+        filename="{epoch}",
+        verbose=True,
+        save_top_k=1,
+        save_last=True,
+    )
 
     logger = TestTubeLogger(save_dir="logs",
                             name=hparams.exp_name,
@@ -196,7 +215,8 @@ def main(hparams):
                             log_graph=False)
 
     trainer = Trainer(max_epochs=hparams.num_epochs,
-                      checkpoint_callback=checkpoint_callback,
+                    #   checkpoint_callback=checkpoint_callback,
+                      enable_checkpointing=True,
                       resume_from_checkpoint=hparams.ckpt_path,
                       logger=logger,
                       weights_summary=None,
@@ -205,7 +225,9 @@ def main(hparams):
                       accelerator='ddp' if hparams.num_gpus>1 else None,
                       num_sanity_val_steps=1,
                       benchmark=True,
-                      profiler="simple" if hparams.num_gpus==1 else None)
+                      profiler="simple" if hparams.num_gpus==1 else None,
+                      callbacks=[checkpoint_callback],
+                      )
 
     trainer.fit(system)
 

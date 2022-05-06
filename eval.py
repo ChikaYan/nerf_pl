@@ -14,6 +14,7 @@ import metrics
 
 from datasets import dataset_dict
 from datasets.depth_utils import *
+from pathlib import Path
 
 torch.backends.cudnn.benchmark = True
 
@@ -23,14 +24,17 @@ def get_opts():
                         default='/home/ubuntu/data/nerf_example_data/nerf_synthetic/lego',
                         help='root directory of dataset')
     parser.add_argument('--dataset_name', type=str, default='blender',
-                        choices=['blender', 'phototourism'],
+                        choices=['blender', 'phototourism', 'llff', 'kubric', 'hypernerf'],
                         help='which dataset to validate')
     parser.add_argument('--scene_name', type=str, default='test',
                         help='scene name, used as output folder name')
     parser.add_argument('--split', type=str, default='val',
-                        choices=['val', 'test', 'test_train'])
+                        choices=['val', 'test', 'test_train', 'all_val'])
     parser.add_argument('--img_wh', nargs="+", type=int, default=[800, 800],
                         help='resolution (img_w, img_h) of the image')
+
+    parser.add_argument('--no_transient', default=False, action="store_true",
+                        help='whether to render transient object')
     # for phototourism
     parser.add_argument('--img_downscale', type=int, default=1,
                         help='how much to downscale the images for phototourism dataset')
@@ -115,8 +119,12 @@ if __name__ == "__main__":
 
     kwargs = {'root_dir': args.root_dir,
               'split': args.split}
-    if args.dataset_name == 'blender':
+    if args.dataset_name == 'blender' or args.dataset_name == 'llff':
         kwargs['img_wh'] = tuple(args.img_wh)
+    elif args.dataset_name == 'kubric':
+        kwargs['image_scale'] = 2.
+    elif args.dataset_name == 'hypernerf':
+        kwargs['image_scale'] = 4.
     else:
         kwargs['img_downscale'] = args.img_downscale
         kwargs['use_cache'] = args.use_cache
@@ -153,11 +161,21 @@ if __name__ == "__main__":
 
     models = {'coarse': nerf_coarse, 'fine': nerf_fine}
 
-    imgs, psnrs = [], []
-    dir_name = f'results/{args.dataset_name}/{args.scene_name}'
-    os.makedirs(dir_name, exist_ok=True)
+    imgs, imgs_static, imgs_mask, psnrs = [], [], [], []
+    dir_name = f'results/{args.dataset_name}/{args.scene_name}/imgs'
+    Path(dir_name).mkdir(exist_ok=True, parents=True)
+    regular_dir = Path(dir_name) / 'regular'
+    static_dir = Path(dir_name) / 'static'
+    mask_dir = Path(dir_name) / 'mask'
+    regular_dir.mkdir(exist_ok=True, parents=True)
+    static_dir.mkdir(exist_ok=True, parents=True)
+    mask_dir.mkdir(exist_ok=True, parents=True)
+    # import pdb; pdb.set_trace()
+    # os.makedirs(dir_name, exist_ok=True)
 
     kwargs = {}
+    if args.no_transient:
+        kwargs['output_transient'] = False
     # define testing poses and appearance index for phototourism
     if args.dataset_name == 'phototourism' and args.split == 'test':
         # define testing camera intrinsics (hard-coded, feel free to change)
@@ -183,6 +201,8 @@ if __name__ == "__main__":
             raise NotImplementedError
         kwargs['output_transient'] = False
 
+    
+
     for i in tqdm(range(len(dataset))):
         sample = dataset[i]
         rays = sample['rays']
@@ -193,26 +213,38 @@ if __name__ == "__main__":
                                     dataset.white_back,
                                     **kwargs)
 
-        if args.dataset_name == 'blender':
+        if args.dataset_name == 'blender' or args.dataset_name == 'llff' or args.dataset_name == 'kubric':
             w, h = args.img_wh
         else:
             w, h = sample['img_wh']
         
         img_pred = np.clip(results['rgb_fine'].view(h, w, 3).cpu().numpy(), 0, 1)
+        img_pred_static = np.clip(results['rgb_fine_static'].view(h, w, 3).cpu().numpy(), 0, 1)
+        img_pred_mask = np.clip(results['transient_mask'].view(h, w, 3).cpu().numpy(), 0, 1)
         
         img_pred_ = (img_pred*255).astype(np.uint8)
+        img_pred_static_ = (img_pred_static*255).astype(np.uint8)
+        img_pred_mask_ = (img_pred_mask*255).astype(np.uint8)
         imgs += [img_pred_]
-        imageio.imwrite(os.path.join(dir_name, f'{i:03d}.png'), img_pred_)
+        imgs_static += [img_pred_static_]
+        imgs_mask += [img_pred_mask_]
+        imageio.imwrite(os.path.join(str(regular_dir), f'{i:03d}.png'), img_pred_)
+        imageio.imwrite(os.path.join(str(static_dir), f'{i:03d}.png'), img_pred_static_)
+        imageio.imwrite(os.path.join(str(mask_dir), f'{i:03d}.png'), img_pred_mask_)
 
         if 'rgbs' in sample:
             rgbs = sample['rgbs']
             img_gt = rgbs.view(h, w, 3)
             psnrs += [metrics.psnr(img_gt, img_pred).item()]
         
-    if args.dataset_name == 'blender' or \
-      (args.dataset_name == 'phototourism' and args.split == 'test'):
-        imageio.mimsave(os.path.join(dir_name, f'{args.scene_name}.{args.video_format}'),
-                        imgs, fps=30)
+    # if args.dataset_name == 'blender' or  args.dataset_name == 'llff' or args.dataset_name == 'kubric' or args.dataset_name == 'hypernerf' or \
+    #   (args.dataset_name == 'phototourism' and args.split == 'test'):
+    imageio.mimsave(os.path.join(f'results/{args.dataset_name}/{args.scene_name}', f'regular.{args.video_format}'),
+                    imgs, fps=30)
+    imageio.mimsave(os.path.join(f'results/{args.dataset_name}/{args.scene_name}', f'static.{args.video_format}'),
+                    imgs_static, fps=30)
+    imageio.mimsave(os.path.join(f'results/{args.dataset_name}/{args.scene_name}', f'mask.{args.video_format}'),
+                    imgs_mask, fps=30)
     
     if psnrs:
         mean_psnr = np.mean(psnrs)
